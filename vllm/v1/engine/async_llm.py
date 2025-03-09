@@ -82,7 +82,7 @@ class AsyncLLM(EngineClient):
                                                 log_stats=self.log_stats)
 
         # EngineCore (starts the engine in background process).
-        self.engine_core = EngineCoreClient.make_client(
+        self.engine_core = EngineCoreClient.make_client(  # start model executor & scheduler
             multiprocess_mode=True,
             asyncio_mode=True,
             vllm_config=vllm_config,
@@ -98,7 +98,7 @@ class AsyncLLM(EngineClient):
         engine_args: AsyncEngineArgs,
         engine_config: Optional[VllmConfig] = None,
         start_engine_loop: bool = True,
-        usage_context: UsageContext = UsageContext.ENGINE_CONTEXT,
+        usage_context: UsageContext = UsageContext.ENGINE_CONTEXT,  # using OpenAI server or not
     ) -> "AsyncLLM":
         """Create an AsyncLLM from the EngineArgs."""
 

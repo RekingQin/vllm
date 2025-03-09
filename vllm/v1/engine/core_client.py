@@ -293,7 +293,7 @@ class MPClient(EngineCoreClient):
             input_path=input_path,
             output_path=self.output_path,
             process_name="EngineCore",
-            target_fn=EngineCoreProc.run_engine_core,
+            target_fn=EngineCoreProc.run_engine_core,  # start engine core
             process_kwargs={
                 "vllm_config": vllm_config,
                 "executor_class": executor_class,

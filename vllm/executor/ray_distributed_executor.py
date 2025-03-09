@@ -496,7 +496,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
         if async_run_tensor_parallel_workers_only:
             ray_workers = self.non_driver_workers
         ray_worker_outputs = [
-            worker.execute_method.remote(sent_method, *args, **kwargs)
+            worker.execute_method.remote(sent_method, *args, **kwargs)  # different worker sent different inputs
             for worker in ray_workers
         ]
 

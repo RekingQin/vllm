@@ -80,7 +80,7 @@ class MultiprocExecutor(Executor):
         self.workers: list[WorkerProcHandle] = []
         for rank in range(self.world_size):
             worker = WorkerProc.make_worker_process(self.vllm_config, rank,
-                                                    rank,
+                                                    rank,  # different rank
                                                     distributed_init_method,
                                                     scheduler_output_handle)
             self.workers.append(worker)

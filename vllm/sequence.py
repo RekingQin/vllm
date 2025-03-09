@@ -1280,7 +1280,7 @@ class HiddenStates(msgspec.Struct, array_like=True,
             [self.hidden_states, self.second_last_token_hidden_states])[index]
 
 
-class ExecuteModelRequest(
+class ExecuteModelRequest(  # need to rewrite request for DP
         msgspec.Struct,
         array_like=True,  # type: ignore[call-arg]
         omit_defaults=True):  # type: ignore[call-arg]

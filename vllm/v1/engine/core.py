@@ -54,7 +54,7 @@ class EngineCore:
         self.log_stats = log_stats
 
         # Setup Model.
-        self.model_executor = executor_class(vllm_config)
+        self.model_executor = executor_class(vllm_config)  # set running environment
 
         # Setup KV Caches and update CacheConfig after profiling.
         num_gpu_blocks, num_cpu_blocks = self._initialize_kv_caches(
@@ -65,7 +65,7 @@ class EngineCore:
         self.structured_output_manager = StructuredOutputManager(vllm_config)
 
         # Setup scheduler.
-        self.scheduler = Scheduler(
+        self.scheduler = Scheduler(  # initialize the scheduler
             scheduler_config=vllm_config.scheduler_config,
             model_config=vllm_config.model_config,
             cache_config=vllm_config.cache_config,
@@ -150,7 +150,7 @@ class EngineCore:
         self.scheduler.finish_requests(request_ids,
                                        RequestStatus.FINISHED_ABORTED)
 
-    def step(self) -> EngineCoreOutputs:
+    def step(self) -> EngineCoreOutputs:  # the core function to execute
         """Schedule, execute, and make output."""
 
         # Check for any requests remaining in the scheduler - unfinished,
@@ -313,7 +313,7 @@ class EngineCoreProc(EngineCore):
         parent_process = psutil.Process().parent()
         engine_core = None
         try:
-            engine_core = EngineCoreProc(*args, **kwargs)
+            engine_core = EngineCoreProc(*args, **kwargs) # start the engine core
             engine_core.run_busy_loop()
 
         except SystemExit:
