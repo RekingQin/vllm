@@ -14,7 +14,7 @@ if __name__ == "__main__":
     llm = LLM(
         model="Qwen/Qwen2.5-0.5B-Instruct",
         device="cpu",
-        dtype="float16",
+        dtype="bfloat16",
         trust_remote_code=True,
         enforce_eager=True,
         max_model_len=2048

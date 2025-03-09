@@ -129,7 +129,7 @@ async def lifespan(app: FastAPI):
 
 
 @asynccontextmanager
-async def build_async_engine_client(
+async def build_async_engine_client(  # prepare engine
         args: Namespace) -> AsyncIterator[EngineClient]:
 
     # Context manager to handle engine_client lifecycle
@@ -945,10 +945,11 @@ async def run_server(args, **uvicorn_kwargs) -> None:
     signal.signal(signal.SIGTERM, signal_handler)
 
     async with build_async_engine_client(args) as engine_client:
+        logger.info("engine_client is already initialized!!!")
         app = build_app(args)
 
         model_config = await engine_client.get_model_config()
-        await init_app_state(engine_client, model_config, app.state, args)
+        await init_app_state(engine_client, model_config, app.state, args)  # initialize the engine
 
         def _listen_addr(a: str) -> str:
             if is_valid_ipv6_address(a):
