@@ -109,7 +109,7 @@ async def init_app(
 
     engine_args = AsyncEngineArgs.from_cli_args(args)
     engine = (llm_engine
-              if llm_engine is not None else AsyncLLMEngine.from_engine_args(
+              if llm_engine is not None else AsyncLLMEngine.from_engine_args(  # initialize engine
                   engine_args, usage_context=UsageContext.API_SERVER))
 
     return app

@@ -160,6 +160,7 @@ async def build_async_engine_client_from_engine_args(
 
         engine_client: Optional[EngineClient] = None
         try:
+            # create AsyncLLMEngine here
             engine_client = AsyncLLMEngine.from_engine_args(
                 engine_args=engine_args,
                 usage_context=UsageContext.OPENAI_API_SERVER)
