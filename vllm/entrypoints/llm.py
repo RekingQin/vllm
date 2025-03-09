@@ -240,7 +240,7 @@ class LLM:
         )
         # Logic to switch between engines is done at runtime instead of import
         # to avoid import order issues
-        self.engine_class = self.get_engine_class()
+        self.engine_class = self.get_engine_class()  # using v1 or v0
         self.llm_engine = self.engine_class.from_engine_args(
             engine_args, usage_context=UsageContext.LLM_CLASS)
 
@@ -1377,7 +1377,7 @@ class LLM:
         total_in_toks = 0
         total_out_toks = 0
         while self.llm_engine.has_unfinished_requests():
-            step_outputs = self.llm_engine.step()
+            step_outputs = self.llm_engine.step()  # engine step of LLM
             for output in step_outputs:
                 if output.finished:
                     outputs.append(output)
