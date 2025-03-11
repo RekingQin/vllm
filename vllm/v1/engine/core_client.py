@@ -205,6 +205,12 @@ class InprocClient(EngineCoreClient):
 class CoreEngine:
     """One per data parallel rank."""
 
+    """
+    new_core_engine = lambda index: CoreEngine(
+            vllm_config, executor_class, log_stats, self.ctx, self.output_path,
+            index)  # index represents the core engine index
+    """
+
     def __init__(
         self,
         vllm_config: VllmConfig,
@@ -212,7 +218,7 @@ class CoreEngine:
         log_stats: bool,
         ctx: Union[zmq.Context, zmq.asyncio.Context],
         output_path: str,
-        index: int = 0,
+        index: int = 0,  # core engine index, for 0 to dp number
     ):
         # Paths and sockets for IPC.
         input_path = get_open_zmq_ipc_path()
@@ -224,7 +230,7 @@ class CoreEngine:
                 input_path=input_path,
                 output_path=output_path,
                 process_name=f"EngineCore_{index}",
-                target_fn=EngineCoreProc.run_engine_core,
+                target_fn=EngineCoreProc.run_engine_core,  # each engine core running target_fn
                 process_kwargs={
                     "vllm_config": vllm_config,
                     "dp_rank": index,
@@ -322,7 +328,7 @@ class MPClient(EngineCoreClient):
         self.encoder = MsgpackEncoder()
         self.decoder = MsgpackDecoder(EngineCoreOutputs)
 
-        # ZMQ setup.
+        # ZMQ setup. using sync ctx or async ctx
         sync_ctx = zmq.Context()
         self.ctx = zmq.asyncio.Context(sync_ctx) if asyncio_mode else sync_ctx
 
@@ -337,7 +343,7 @@ class MPClient(EngineCoreClient):
 
         new_core_engine = lambda index: CoreEngine(
             vllm_config, executor_class, log_stats, self.ctx, self.output_path,
-            index)
+            index)  # index represents the core engine index
 
         # Start engine core process(es).
         self._init_core_engines(vllm_config, new_core_engine,
@@ -500,7 +506,7 @@ class AsyncMPClient(MPClient):
             executor_class=executor_class,
             log_stats=log_stats,
         )
-
+        # async queues
         self.outputs_queue: Optional[asyncio.Queue[EngineCoreOutputs]] = None
         self.queue_task: Optional[asyncio.Task] = None
 
@@ -625,7 +631,7 @@ class DPAsyncMPClient(AsyncMPClient):
 
         assert len(self.core_engines) > 1
 
-        # Control message used for triggering dp idle mode loop.
+        # Control message used for triggering dp idle mode loop. using empty value
         self.start_dp_msg = (EngineCoreRequestType.START_DP.value,
                              self.encoder.encode(None))
 
@@ -643,7 +649,7 @@ class DPAsyncMPClient(AsyncMPClient):
     ) -> None:
 
         # Launch a core engine for each data parallel rank.
-        dp_size = vllm_config.parallel_config.data_parallel_size
+        dp_size = vllm_config.parallel_config.data_parallel_size  # 1 dp, 1 core engine
         for i in range(dp_size):
             core_engines.append(new_core_engine(i))
 
@@ -666,6 +672,7 @@ class DPAsyncMPClient(AsyncMPClient):
 
         msg = (EngineCoreRequestType.ADD.value, self.encoder.encode(request))
 
+        # select least busy EngineCore to processing current request
         chosen_engine = self.get_core_engine_for_request()
         self.reqs_in_flight[request.request_id] = chosen_engine
         chosen_engine.num_reqs_in_flight += 1
@@ -695,7 +702,7 @@ class DPAsyncMPClient(AsyncMPClient):
         if outputs.engine_paused:
             assert self.num_engines_running >= 1
             self.num_engines_running -= 1
-            if not self.num_engines_running and self.reqs_in_flight:
+            if not self.num_engines_running and self.reqs_in_flight:  # some dp is running, but some dp is empty
                 # If there are requests in flight here, they must have
                 # been sent after the engines paused. We must make
                 # sure to start the other engines:

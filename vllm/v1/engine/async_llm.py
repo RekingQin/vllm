@@ -10,7 +10,7 @@ import numpy as np
 
 from vllm.config import ModelConfig, VllmConfig
 from vllm.engine.arg_utils import AsyncEngineArgs
-from vllm.engine.protocol import EngineClient
+from vllm.engine.protocol import EngineClient  # an abstract class
 from vllm.envs import VLLM_V1_OUTPUT_PROC_CHUNK_SIZE
 from vllm.inputs import INPUT_REGISTRY, InputRegistry, PromptType
 from vllm.inputs.preprocess import InputPreprocessor
@@ -88,7 +88,7 @@ class AsyncLLM(EngineClient):
                                                 log_stats=self.log_stats)
 
         # EngineCore (starts the engine in background process).
-        self.engine_core = EngineCoreClient.make_client(
+        self.engine_core = EngineCoreClient.make_client(  # create DPAsyncMPClient and DP number
             multiprocess_mode=True,
             asyncio_mode=True,
             vllm_config=vllm_config,

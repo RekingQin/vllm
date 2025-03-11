@@ -2135,6 +2135,7 @@ def make_zmq_socket(
     else:
         buf_size = -1  # Use system default buffer size
 
+    # using PUSH/PULL mode, in request process, 1 sender vs N receiver, in repsonse process, 1 receiver vs N sender
     if socket_type == zmq.constants.PULL:
         socket.setsockopt(zmq.constants.RCVHWM, 0)
         socket.setsockopt(zmq.constants.RCVBUF, buf_size)

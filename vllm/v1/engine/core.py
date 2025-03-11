@@ -142,7 +142,7 @@ class EngineCore:
             # Start grammar compilation asynchronously
             self.structured_output_manager.populate_cache(req)
 
-        self.scheduler.add_request(req)
+        self.scheduler.add_request(req)  # EngineCore receive req, and using scheduler add it to TASK waiting queue
 
     def abort_requests(self, request_ids: list[str]):
         """Abort requests from the scheduler."""
@@ -263,6 +263,7 @@ class EngineCoreProc(EngineCore):
         # and to overlap some serialization/deserialization with the
         # model forward pass.
         # Threads handle Socket <-> Queues and core_busy_loop uses Queue.
+        # using input queue to get requests from DPAsyncMPClient, and send output back to  output_queue
         self.input_queue: queue.Queue[tuple[EngineCoreRequestType,
                                             Any]] = queue.Queue()
         self.output_queue: queue.Queue[EngineCoreOutputs] = queue.Queue()
@@ -308,7 +309,7 @@ class EngineCoreProc(EngineCore):
             if parallel_config.data_parallel_size > 1:
                 # Set data parallel rank for this engine process.
                 parallel_config.data_parallel_rank = dp_rank
-                engine_core = DPEngineCoreProc(*args, **kwargs)
+                engine_core = DPEngineCoreProc(*args, **kwargs)  # using DPEngineCoreProc
             else:
                 engine_core = EngineCoreProc(*args, **kwargs)
 
@@ -342,6 +343,7 @@ class EngineCoreProc(EngineCore):
     def _process_input_queue(self):
         """Exits when an engine step needs to be performed."""
 
+        # firstly, processing unfinished requests
         while not self.global_unfinished_reqs and not (
                 self.scheduler.has_requests()):
             if self.input_queue.empty():
@@ -373,7 +375,7 @@ class EngineCoreProc(EngineCore):
             self.abort_requests(request)
         elif request_type == EngineCoreRequestType.START_DP:
             if not self.global_unfinished_reqs:
-                logger.info("EngineCore starting idle loop.")
+                logger.info("EngineCore starting idle loop.")  # idle loop
                 self.global_unfinished_reqs = True
         elif request_type == EngineCoreRequestType.UTILITY:
             call_id, method_name, args = request
@@ -490,13 +492,13 @@ class DPEngineCoreProc(EngineCoreProc):
         # Loop until process is sent a SIGINT or SIGTERM
         while True:
             # 1) Poll the input queue until there is work to do.
-            self._process_input_queue()
+            self._process_input_queue()  # using EngineCoreProc._process_input_queue
 
             local_unfinished_reqs = self.scheduler.has_unfinished_requests()
 
             if not local_unfinished_reqs and (
                     self.scheduler.has_finished_requests()):
-                self._process_engine_step()
+                self._process_engine_step()  # using EngineCoreProc._process_engine_step
                 if not self.global_unfinished_reqs:
                     continue
 
@@ -532,6 +534,6 @@ class DPEngineCoreProc(EngineCoreProc):
         # if self.counter != 20:
         #     return True
         # self.counter = 0
-
+        # get maximum unfinished engine processing requests length
         return ParallelConfig.has_unfinished_dp(self.dp_group,
                                                 local_unfinished)
