@@ -345,17 +345,17 @@ class FusedMoE(torch.nn.Module):
         # uninitialized (this happens when testing)
         self.tp_size = (tp_size if tp_size is not None else
                         get_tensor_model_parallel_world_size())
-        tp_rank = 0 if self.tp_size == 1 else get_tensor_model_parallel_rank()
+        tp_rank = 0 if self.tp_size == 1 else get_tensor_model_parallel_rank()  # tp rank = 0
         self.dp_size = (dp_size
                         if dp_size is not None else get_dp_group().world_size)
         self.dp_rank = (0
-                        if self.dp_size == 1 else get_dp_group().rank_in_group)
+                        if self.dp_size == 1 else get_dp_group().rank_in_group)  # may use dp rank
         self.global_num_experts = num_experts
 
         # Use expert parallelism instead of tensor parallelism?
         vllm_config = get_current_vllm_config()
         use_ep = (vllm_config.parallel_config.enable_expert_parallel
-                  and self.tp_size > 1)
+                  and self.tp_size > 1)  # TODO, change here
 
         # For smuggling this layer into the fused moe custom op
         self.use_direct_call = self.dp_size == 1
@@ -374,7 +374,7 @@ class FusedMoE(torch.nn.Module):
             self.ep_size = self.tp_size * self.dp_size
             self.tp_size = 1
 
-            self.local_num_experts, self.expert_map = determine_expert_map(
+            self.local_num_experts, self.expert_map = determine_expert_map(  # determine each expert on which rank
                 ep_size=self.ep_size,
                 ep_rank=self.ep_rank,
                 global_num_experts=self.global_num_experts)
@@ -749,7 +749,7 @@ class FusedMoE(torch.nn.Module):
                 router_logits: torch.Tensor):
         if self.use_direct_call:
             return self.forward_impl(hidden_states, router_logits)
-        else:
+        else:  # using this branch
             return torch.ops.vllm.moe_forward(hidden_states, router_logits,
                                               self.layer_name)
 
@@ -789,10 +789,10 @@ class FusedMoE(torch.nn.Module):
                 self.dp_rank - 1]
             end = cu_tokens_across_dp_cpu[self.dp_rank]
 
-            all_hidden_states = get_dp_group().all_reduce(final_hidden_states)
-            final_hidden_states = all_hidden_states[start:end, :]
+            all_hidden_states = get_dp_group().all_reduce(final_hidden_states)  # all reduce
+            final_hidden_states = all_hidden_states[start:end, :]  # select part of all hidden stats
 
-        if self.reduce_results and (self.tp_size > 1 or self.ep_size > 1):
+        if self.reduce_results and (self.tp_size > 1 or self.ep_size > 1):  # skipped
             # Default set to False. (May have to add shared expert outputs.)
             final_hidden_states = tensor_model_parallel_all_reduce(
                 final_hidden_states)

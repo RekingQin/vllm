@@ -327,7 +327,7 @@ class ModelConfig:
 
         hf_config = get_config(self.hf_config_path or self.model,
                                trust_remote_code, revision, code_revision,
-                               config_format)
+                               config_format)  # get PretrainedConfig
 
         if hf_overrides_kw:
             logger.info("Overriding HF config with %s", hf_overrides_kw)

@@ -67,7 +67,7 @@ def set_forward_context(attn_metadata: Any,
     if need_to_track_batchsize:
         forward_start_time = time.perf_counter()
     dp_metadata: Optional[DPMetadata] = None
-    if vllm_config.parallel_config.data_parallel_size > 1:
+    if vllm_config.parallel_config.data_parallel_size > 1:  # for DP
         dp_size = vllm_config.parallel_config.data_parallel_size
         dp_rank = vllm_config.parallel_config.data_parallel_rank
         if attn_metadata is not None:
@@ -77,16 +77,16 @@ def set_forward_context(attn_metadata: Any,
                     attn_metadata.num_decode_tokens
             else:
                 # for v1 attention backends
-                batchsize = attn_metadata.num_input_tokens
+                batchsize = attn_metadata.num_input_tokens  # input batch tokens
         else:
             batchsize = num_tokens
         num_tokens_across_dp = [0] * dp_size
-        num_tokens_across_dp[dp_rank] = batchsize
+        num_tokens_across_dp[dp_rank] = batchsize  # except dp_rank, all other rankds are 0
         num_tokens_tensor = torch.tensor(num_tokens_across_dp,
                                          device="cpu",
                                          dtype=torch.int32)
         from vllm.distributed.parallel_state import get_dp_group
-        dist.all_reduce(num_tokens_tensor, group=get_dp_group().cpu_group)
+        dist.all_reduce(num_tokens_tensor, group=get_dp_group().cpu_group)  # do all reduce, why using CPU group which using gloo
         cu_tokens_across_dp_cpu = torch.cumsum(num_tokens_tensor, dim=0)
         dp_metadata = DPMetadata(cu_tokens_across_dp_cpu)
 

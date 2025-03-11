@@ -70,12 +70,12 @@ class DeepseekV2MLP(nn.Module):
         prefix: str = "",
     ) -> None:
         super().__init__()
-        self.gate_up_proj = MergedColumnParallelLinear(
+        self.gate_up_proj = MergedColumnParallelLinear(  # TODO, just using Linear directly
             hidden_size, [intermediate_size] * 2,
             bias=False,
             quant_config=quant_config,
             prefix=f"{prefix}.gate_up_proj")
-        self.down_proj = RowParallelLinear(intermediate_size,
+        self.down_proj = RowParallelLinear(intermediate_size,  # TODO, just using Linear directly
                                            hidden_size,
                                            bias=False,
                                            quant_config=quant_config,
@@ -110,6 +110,7 @@ class DeepseekV2MoE(nn.Module):
             raise ValueError(f"Unsupported activation: {config.hidden_act}. "
                              "Only silu is supported for now.")
 
+        # loading into 1 GPU
         self.gate = ReplicatedLinear(config.hidden_size,
                                      config.n_routed_experts,
                                      bias=False,
@@ -170,7 +171,7 @@ class DeepseekV2MoE(nn.Module):
                 # This is a special case to avoid FP16 overflow
                 final_hidden_states = final_hidden_states + shared_output \
                     * (1. / self.routed_scaling_factor)
-        if self.tp_size > 1:
+        if self.tp_size > 1:  # skipped
             final_hidden_states = tensor_model_parallel_all_reduce(
                 final_hidden_states)
 
@@ -499,7 +500,7 @@ class DeepseekV2DecoderLayer(nn.Module):
         # DecoderLayers are created with `make_layers` which passes the prefix
         # with the layer's index.
         layer_idx = int(prefix.split(sep='.')[-1])
-        if model_config.use_mla:
+        if model_config.use_mla:  # make sure using MLA
             attn_cls = DeepseekV2MLAAttention
         else:
             attn_cls = DeepseekV2Attention
@@ -524,7 +525,7 @@ class DeepseekV2DecoderLayer(nn.Module):
         if (config.n_routed_experts is not None
                 and layer_idx >= config.first_k_dense_replace
                 and layer_idx % config.moe_layer_freq == 0):
-            self.mlp = DeepseekV2MoE(
+            self.mlp = DeepseekV2MoE(  # using MoE
                 config=config,
                 quant_config=quant_config,
                 prefix=f"{prefix}.mlp",
@@ -621,7 +622,7 @@ class DeepseekV2Model(nn.Module):
                 ["hidden_states", "residual"], config.hidden_size))
 
     def get_input_embeddings(self, input_ids: torch.Tensor) -> torch.Tensor:
-        return self.embed_tokens(input_ids)
+        return self.embed_tokens(input_ids)  # calculate token ids embeddings
 
     def forward(
         self,
@@ -664,7 +665,7 @@ class DeepseekV2ForCausalLM(nn.Module, SupportsPP):
         self.quant_config = quant_config
         self.model = DeepseekV2Model(vllm_config=vllm_config,
                                      prefix=maybe_prefix(prefix, "model"))
-        if get_pp_group().is_last_rank:
+        if get_pp_group().is_last_rank:  # last rank in PP to output token
             self.lm_head = ParallelLMHead(config.vocab_size,
                                           config.hidden_size,
                                           quant_config=quant_config)
@@ -809,7 +810,7 @@ class DeepseekV2ForCausalLM(nn.Module, SupportsPP):
         return loaded_params
 
 
-class DeepseekV3ForCausalLM(DeepseekV2ForCausalLM):
+class DeepseekV3ForCausalLM(DeepseekV2ForCausalLM):  # v3 using v2 directly
     pass
 
 

@@ -986,7 +986,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
 
         # Run the decoder.
         # Use persistent buffers for CUDA graphs.
-        with set_forward_context(attn_metadata, self.vllm_config):
+        with set_forward_context(attn_metadata, self.vllm_config):  # set forward context
             hidden_states = self.model(
                 input_ids=input_ids,
                 positions=positions,

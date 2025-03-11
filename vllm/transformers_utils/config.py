@@ -244,7 +244,7 @@ def get_config(
     code_revision: Optional[str] = None,
     config_format: ConfigFormat = ConfigFormat.AUTO,
     **kwargs,
-) -> PretrainedConfig:
+) -> PretrainedConfig:  # get PretrainedConfig
     # Separate model folder from file path for GGUF models
 
     is_gguf = check_gguf_file(model)
