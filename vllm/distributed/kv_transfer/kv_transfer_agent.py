@@ -27,7 +27,7 @@ class KVTransferAgent:
     
     Target use cases:
         1. Disaggregated prefill
-        2. Remote KV cache storage
+        2. Remote KV cache storage, using 3FS??
     """
 
     def __init__(

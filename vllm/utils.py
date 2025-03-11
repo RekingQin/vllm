@@ -1919,6 +1919,7 @@ def resolve_obj_by_qualname(qualname: str) -> Any:
     """
     module_name, obj_name = qualname.rsplit(".", 1)
     module = importlib.import_module(module_name)
+    obj_name = "cpu"
     return getattr(module, obj_name)
 
 

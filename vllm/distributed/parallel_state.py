@@ -137,7 +137,7 @@ class GroupCoordinator:
         communication.
     """
 
-    # available attributes:
+    # available attributes: class variables?? no usage, just tell you variable names list
     rank: int  # global rank
     ranks: List[int]  # global ranks in the group
     world_size: int  # size of the group
@@ -149,7 +149,7 @@ class GroupCoordinator:
     #   2     |   1  |  2   |     0      |       2
     #   3     |   1  |  3   |     1      |       3
     local_rank: int  # local rank used to assign devices
-    rank_in_group: int  # rank inside the group
+    rank_in_group: int  # rank inside the group, rank_in_group == rank??
     cpu_group: ProcessGroup  # group for CPU communication
     device_group: ProcessGroup  # group for device communication
     use_device_communicator: bool  # whether to use device communicator
@@ -736,7 +736,7 @@ def init_model_parallel_group(
         group_name=group_name,
     )
 
-
+# each worker must have _TP, _PP, _DP and _WORLD
 _TP: Optional[GroupCoordinator] = None
 
 
@@ -767,6 +767,7 @@ def get_pp_group() -> GroupCoordinator:
 # kept for backward compatibility
 get_pipeline_model_parallel_group = get_pp_group
 
+# used for prefill/decode disaggregation & kv cache saved on external storage
 _KV_TRANSFER: Optional[kv_transfer.KVTransferAgent] = None
 
 
@@ -807,6 +808,7 @@ def set_custom_all_reduce(enable: bool):
     _ENABLE_CUSTOM_ALL_REDUCE = enable
 
 
+# global default environment!!
 def init_distributed_environment(
     world_size: int = -1,
     rank: int = -1,
@@ -838,7 +840,7 @@ def init_distributed_environment(
             "distributed_init_method must be provided when initializing "
             "distributed environment")
         # this backend is used for WORLD
-        torch.distributed.init_process_group(
+        torch.distributed.init_process_group(  # even using dp, only one global process group (_WORLD)
             backend=backend,
             init_method=distributed_init_method,
             world_size=world_size,
@@ -854,7 +856,7 @@ def init_distributed_environment(
         else:
             local_rank = rank
     global _WORLD
-    if _WORLD is None:
+    if _WORLD is None:  # only have one _WORLD ??
         ranks = list(range(torch.distributed.get_world_size()))
         _WORLD = init_world_group(ranks, local_rank, backend)
     else:
@@ -862,11 +864,14 @@ def init_distributed_environment(
             "world group already initialized with a different world size")
 
 
+# warning: no DP configuration
 def initialize_model_parallel(
     tensor_model_parallel_size: int = 1,
     pipeline_model_parallel_size: int = 1,
+    data_parallel_size: int = 1, # add data_parallel_size for DP
     backend: Optional[str] = None,
 ) -> None:
+    # prepare
     """
     Initialize model parallel groups.
 
@@ -896,7 +901,7 @@ def initialize_model_parallel(
     backend = backend or torch.distributed.get_backend(
         get_world_group().device_group)
 
-    data_parallel_size = 1
+    # data_parallel_size = 1
     from vllm.config import get_current_vllm_config
     config = get_current_vllm_config()
     if config is not None:
@@ -974,6 +979,7 @@ def ensure_kv_transfer_initialized(vllm_config: "VllmConfig") -> None:
 def ensure_model_parallel_initialized(
     tensor_model_parallel_size: int,
     pipeline_model_parallel_size: int,
+    data_parallel_size: int = 1,
     backend: Optional[str] = None,
 ) -> None:
     """Helper to initialize model parallel groups if they are not initialized,
@@ -983,25 +989,32 @@ def ensure_model_parallel_initialized(
     backend = backend or torch.distributed.get_backend(
         get_world_group().device_group)
     if not model_parallel_is_initialized():
+        # may add data_parallel_size
         initialize_model_parallel(tensor_model_parallel_size,
                                   pipeline_model_parallel_size, backend)
         return
-
     assert (
         get_tensor_model_parallel_world_size() == tensor_model_parallel_size
     ), ("tensor parallel group already initialized, but of unexpected size: "
         f"{get_tensor_model_parallel_world_size()=} vs. "
         f"{tensor_model_parallel_size=}")
+
     pp_world_size = get_pp_group().world_size
     assert (pp_world_size == pipeline_model_parallel_size), (
         "pipeline parallel group already initialized, but of unexpected size: "
         f"{pp_world_size=} vs. "
         f"{pipeline_model_parallel_size=}")
 
+    dp_world_size = get_dp_group().world_size
+    assert (dp_world_size == data_parallel_size), (
+        "data parallel group already initialized, but of unexpected size: "
+        f"{dp_world_size=} vs. "
+        f"{data_parallel_size=}")
+
 
 def model_parallel_is_initialized():
     """Check if tensor and pipeline parallel groups are initialized."""
-    return (_TP is not None and _PP is not None)
+    return (_TP is not None and _PP is not None and _DP is not None)
 
 
 _TP_STATE_PATCHED = False
@@ -1042,8 +1055,12 @@ def get_tensor_model_parallel_rank():
     return get_tp_group().rank_in_group
 
 
+def get_data_parallel_rank():
+    return get_dp_group().rank_in_group
+
+
 def destroy_model_parallel():
-    """Set the groups to none and destroy them."""
+    """Set the groups to none and destroy them."""  # no order considerations???
     global _TP
     if _TP:
         _TP.destroy()
