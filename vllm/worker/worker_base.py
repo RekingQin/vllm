@@ -507,7 +507,7 @@ class WorkerWrapperBase:
         All workers have rpc_rank=0, but they have different ranks in the TP
         group.
         """
-        self.rpc_rank = rpc_rank
+        self.rpc_rank = rpc_rank  # the ranker in executor
         self.worker: Optional[WorkerBase] = None
         # do not store this `vllm_config`, `init_worker` will set the final
         # one. TODO: investigate if we can remove this field in
@@ -545,6 +545,7 @@ class WorkerWrapperBase:
         Here we inject some common logic before initializing the worker.
         Arguments are passed to the worker class constructor.
         """
+        # initialize worker
         kwargs = all_kwargs[self.rpc_rank]
         self.vllm_config = kwargs.get("vllm_config", None)
         assert self.vllm_config is not None, (
@@ -554,6 +555,7 @@ class WorkerWrapperBase:
         from vllm.plugins import load_general_plugins
         load_general_plugins()
 
+        # get worker class
         if isinstance(self.vllm_config.parallel_config.worker_cls, str):
             worker_class = resolve_obj_by_qualname(
                 self.vllm_config.parallel_config.worker_cls)
@@ -591,7 +593,7 @@ class WorkerWrapperBase:
                     worker_extension_cls, worker_class, extended_calls)
         with set_current_vllm_config(self.vllm_config):
             # To make vLLM config available during worker initialization
-            self.worker = worker_class(**kwargs)
+            self.worker = worker_class(**kwargs)  # construct worker
             assert self.worker is not None
 
     def initialize_from_config(self, kv_cache_configs: List[Any]) -> None:

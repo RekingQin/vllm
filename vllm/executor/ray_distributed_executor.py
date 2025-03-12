@@ -70,10 +70,10 @@ class RayDistributedExecutor(DistributedExecutorBase):
 
     uses_ray: bool = True
 
-    def _init_executor(self) -> None:
+    def _init_executor(self) -> None:  # NOTE: initialize ray executor here
         self.forward_dag: Optional[ray.dag.CompiledDAG] = None
         if envs.VLLM_USE_V1:
-            # V1 uses SPMD worker and compiled DAG
+            # V1 uses SPMD worker and compiled DAG, V1 using Ray Compiled DAG ????
             os.environ["VLLM_USE_RAY_SPMD_WORKER"] = "1"
             os.environ["VLLM_USE_RAY_COMPILED_DAG"] = "1"
 
@@ -102,7 +102,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
                 "VLLM_USE_RAY_COMPILED_DAG=1")
 
         assert self.uses_ray
-        initialize_ray_cluster(self.parallel_config)
+        initialize_ray_cluster(self.parallel_config)  # must understand placement group
         placement_group = self.parallel_config.placement_group
 
         # Disable Ray usage stats collection.
@@ -156,7 +156,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
 
     def _init_workers_ray(self, placement_group: "PlacementGroup",
                           **ray_remote_kwargs):
-        num_gpus = envs.VLLM_RAY_PER_WORKER_GPUS
+        num_gpus = envs.VLLM_RAY_PER_WORKER_GPUS  # should be 1 currently
 
         # The driver dummy worker does not actually use any resources.
         # It holds the resource for the driver worker.
@@ -167,7 +167,8 @@ class RayDistributedExecutor(DistributedExecutorBase):
         # Used in ray compiled DAG: indexed first by PP rank,
         # and then TP rank. In other words, the inner list is
         # the TP group of workers for a PP rank.
-        self.pp_tp_workers: List[List[RayWorkerWrapper]] = []
+        self.pp_tp_workers: List[List[RayWorkerWrapper]] = []  # only workers in current executor
+        # self.dp_workers: List[RayWorkerWrapper] = []  # should use dp worker
 
         if self.parallel_config.ray_workers_use_nsight:
             ray_remote_kwargs = self._configure_ray_workers_use_nsight(
@@ -177,7 +178,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
 
         # Create the workers.
         bundle_indices: List[int]
-        if envs.VLLM_RAY_BUNDLE_INDICES:
+        if envs.VLLM_RAY_BUNDLE_INDICES:  # skipped
             # Use the bundle indices specified by the user.
             bundle_indices = list(
                 map(int, envs.VLLM_RAY_BUNDLE_INDICES.split(",")))
@@ -194,11 +195,11 @@ class RayDistributedExecutor(DistributedExecutorBase):
             for bundle_id, bundle in enumerate(placement_group.bundle_specs):
                 if bundle.get(current_platform.ray_device_key, 0):
                     bundle_indices.append(bundle_id)
-            bundle_indices = bundle_indices[:self.parallel_config.world_size]
+            bundle_indices = bundle_indices[:self.parallel_config.world_size]  # world_size = 1
 
         worker_metadata: List[RayWorkerMetaData] = []
         driver_ip = get_ip()
-        for rank, bundle_id in enumerate(bundle_indices):
+        for rank, bundle_id in enumerate(bundle_indices):  # here rank is global
             scheduling_strategy = PlacementGroupSchedulingStrategy(
                 placement_group=placement_group,
                 placement_group_capture_child_tasks=True,
@@ -224,7 +225,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
                 )(RayWorkerWrapper).remote(vllm_config=self.vllm_config,
                                            rpc_rank=rank)
             worker_metadata.append(
-                RayWorkerMetaData(worker=worker, created_rank=rank))
+                RayWorkerMetaData(worker=worker, created_rank=rank))  # hasn't set adjusted rank
 
         worker_ips = ray.get([
             each.worker.get_node_ip.remote()  # type: ignore[attr-defined]
@@ -243,7 +244,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
                     # If the worker is on the same node as the driver, we use it
                     # as the resource holder for the driver process.
                     self.driver_dummy_worker = worker
-                    self.driver_worker = RayWorkerWrapper(
+                    self.driver_worker = RayWorkerWrapper(  # start a new worker as the Driver Worker
                         vllm_config=self.vllm_config, rpc_rank=0)
                     worker_metadata.pop(i)
                     break
@@ -281,7 +282,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
                                         key=sort_by_driver_then_worker_ip)
         start_rank = 0 if self.use_ray_spmd_worker else 1
         for i, item in enumerate(sorted_worker_metadata):
-            item.adjusted_rank = i + start_rank
+            item.adjusted_rank = i + start_rank  # set adjusted rank
         self.workers = [item.worker for item in sorted_worker_metadata]
         rerank_mapping = {
             item.created_rank: item.adjusted_rank
@@ -359,6 +360,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
         self._env_vars_for_all_workers = (
             all_args_to_update_environment_variables)
 
+        # update environment variables
         self._run_workers("update_environment_variables",
                           self._get_env_vars_to_be_updated())
 
@@ -446,7 +448,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
             return super().execute_model(execute_model_req)
 
         if self.forward_dag is None:
-            self.forward_dag = self._compiled_ray_dag(enable_asyncio=False)
+            self.forward_dag = self._compiled_ray_dag(enable_asyncio=False)  # compile the DAG
 
         if self.use_v1:
             serialized_data = execute_model_req
@@ -518,7 +520,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
         if self.workers:
             ray_worker_outputs = ray.get(ray_worker_outputs)
 
-        return driver_worker_output + ray_worker_outputs
+        return driver_worker_output + ray_worker_outputs  # driver output put at head
 
     def _wait_for_tasks_completion(self, parallel_worker_tasks: Any) -> None:
         """Wait for futures returned from _run_workers() with

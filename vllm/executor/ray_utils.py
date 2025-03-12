@@ -34,7 +34,7 @@ try:
         from ray._private.state import state as _state
         available_resources_per_node = _state._available_resources_per_node
 
-    class RayWorkerWrapper(WorkerWrapperBase):
+    class RayWorkerWrapper(WorkerWrapperBase):  # Ray Worker in vLLM
         """Ray wrapper for vllm.worker.Worker, allowing Worker to be
         lazily initialized after Ray sets CUDA_VISIBLE_DEVICES."""
 
@@ -49,6 +49,8 @@ try:
             self.input_decoder = msgspec.msgpack.Decoder(ExecuteModelRequest,
                                                          dec_hook=decode_hook)
             self.output_encoder = msgspec.msgpack.Encoder(enc_hook=encode_hook)
+
+            # not having initialization for Ray Workers
 
         def get_node_ip(self) -> str:
             return get_ip()
@@ -173,9 +175,9 @@ def _verify_bundles(placement_group: "PlacementGroup",
     assert ray.is_initialized(), (
         "Ray is not initialized although distributed-executor-backend is ray.")
     pg_data = placement_group_table(placement_group)
-    # bundle_idx -> node_id
+    # bundle_idx -> node_id, like {0: "node1", 1: "node2"}
     bundle_to_node_ids = pg_data["bundles_to_node_id"]
-    # bundle_idx -> bundle (e.g., {"GPU": 1})
+    # bundle_idx -> bundle (e.g., 0: {"GPU": 1}, 1: {"GPU": 1})
     bundles = pg_data["bundles"]
     # node_id -> List of bundle (e.g., {"GPU": 1})
     node_id_to_bundle: Dict[str, List[Dict[str, float]]] = defaultdict(list)
@@ -286,7 +288,7 @@ def initialize_ray_cluster(
 
     # Connect to a ray cluster.
     if current_platform.is_rocm() or current_platform.is_xpu():
-        # Try to connect existing ray instance and create a new one if not found
+        # Try to connect existing ray instance and create a new one if not found  # ray is initialized firstly
         try:
             ray.init("auto", ignore_reinit_error=True)
         except ConnectionError:
@@ -299,7 +301,7 @@ def initialize_ray_cluster(
     else:
         ray.init(address=ray_address, ignore_reinit_error=True)
 
-    if parallel_config.placement_group:
+    if parallel_config.placement_group:  # by default, here is None
         # Placement group is already set.
         return
 
@@ -311,14 +313,14 @@ def initialize_ray_cluster(
 
     # Create placement group for worker processes
     current_placement_group = ray.util.get_current_placement_group()
-    if current_placement_group:
+    if current_placement_group:  # should be None
         # We are in a placement group
         bundles = current_placement_group.bundle_specs
         # Verify that we can use the placement group.
         device_bundles = 0
         for bundle in bundles:
             bundle_devices = bundle.get(device_str, 0)
-            if bundle_devices > 1:
+            if bundle_devices > 1:  # each bundle only have 1 GPU at most
                 raise ValueError(
                     "Placement group bundle cannot have more than 1 "
                     f"{device_str}.")
@@ -331,16 +333,16 @@ def initialize_ray_cluster(
                 f"Required number of devices: {parallel_config.world_size}. "
                 f"Total number of devices: {device_bundles}.")
     else:
-        num_devices_in_cluster = ray.cluster_resources().get(device_str, 0)
+        num_devices_in_cluster = ray.cluster_resources().get(device_str, 0)  # how many GPUs in the ray cluster
         # Log a warning message and delay resource allocation failure response.
         # Avoid immediate rejection to allow user-initiated placement group
         # created and wait cluster to be ready
-        if parallel_config.world_size > num_devices_in_cluster:
+        if parallel_config.world_size > num_devices_in_cluster:  # world size == 1 ??
             logger.warning(
                 "The number of required %ss exceeds the total "
                 "number of available %ss in the placement group.", device_str,
                 device_str)
-        # Create a new placement group
+        # Create a new placement group, each bundle only have 1 GPU
         placement_group_specs: List[Dict[str, float]] = ([{
             device_str: 1.0
         } for _ in range(parallel_config.world_size)])
@@ -359,11 +361,11 @@ def initialize_ray_cluster(
                 f"available in a node {current_node_id=} {current_ip=}.")
         # This way, at least bundle is required to be created in a current
         # node.
-        placement_group_specs[0][f"node:{current_ip}"] = 0.001
+        placement_group_specs[0][f"node:{current_ip}"] = 0.001  # make sure bundle 0 is attached current machine/node
 
         # By default, Ray packs resources as much as possible.
         current_placement_group = ray.util.placement_group(
-            placement_group_specs, strategy="PACK")
+            placement_group_specs, strategy="PACK")  # using
         _wait_until_pg_ready(current_placement_group)
 
     assert current_placement_group is not None

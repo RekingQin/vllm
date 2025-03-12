@@ -37,12 +37,12 @@ class Executor(ExecutorBase):
         elif distributed_executor_backend == "ray":
             from vllm.v1.executor.ray_distributed_executor import (  # noqa
                 RayDistributedExecutor)
-            executor_class = RayDistributedExecutor
+            executor_class = RayDistributedExecutor  # what we want
         elif distributed_executor_backend == "mp":
             from vllm.v1.executor.multiproc_executor import MultiprocExecutor
-            executor_class = MultiprocExecutor
+            executor_class = MultiprocExecutor  # single node with multi-cards
         elif distributed_executor_backend == "uni":
-            executor_class = UniProcExecutor
+            executor_class = UniProcExecutor  # single card
         elif distributed_executor_backend == "external_launcher":
             # TODO: make v1 scheduling deterministic
             # to support external launcher

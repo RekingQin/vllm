@@ -27,6 +27,10 @@ class FutureWrapper(Future):
 class RayDistributedExecutor(RayDistributedExecutorV0, Executor):
     """Ray distributed executor using Ray Compiled Graphs."""
 
+    def __init__(self):
+        super().__init__()
+        # wrapper.init_worker(all_kwargs)
+
     @property
     def max_concurrent_batches(self) -> int:
         """Ray distributed executor supports pipeline parallelism,

@@ -1454,21 +1454,21 @@ class ParallelConfig:
 
         ray_only_devices = ["tpu"]
         from vllm.platforms import current_platform
-        if (current_platform.device_type in ray_only_devices
+        if (current_platform.device_type in ray_only_devices  # only ray device(TPU)
                 and self.world_size > 1):
             if self.distributed_executor_backend is None:
-                self.distributed_executor_backend = "ray"
+                self.distributed_executor_backend = "ray"  # using ray by default
             if self.distributed_executor_backend != "ray":
                 raise ValueError(
                     f"{current_platform.device_type.upper()} backend only "
                     "supports Ray for distributed inference.")
 
-        if self.distributed_executor_backend is None and self.world_size > 1:
+        if self.distributed_executor_backend is None and self.world_size_across_dp > 1:
             # We use multiprocessing by default if world_size fits on the
             # current node and we aren't in a ray placement group.
 
             from vllm.executor import ray_utils
-            backend = "mp"
+            backend = "mp"  # if ray is not usable, using mp(multiprocess)
             ray_found = ray_utils.ray_is_available()
             if current_platform.is_neuron():
                 # neuron uses single process to control multiple devices
@@ -1482,20 +1482,21 @@ class ParallelConfig:
                                      "ray`.") from ray_utils.ray_import_err
                 backend = "ray"
             elif ray_found:
-                if self.placement_group:
+                if self.placement_group:  # usually, placement_group is None
                     backend = "ray"
                 else:
+                    # NOTE: ray should be initialized firstly
                     from ray import is_initialized as ray_is_initialized
                     if ray_is_initialized():
                         from ray.util import get_current_placement_group
                         if get_current_placement_group():
-                            backend = "ray"
+                            backend = "ray"  # finally, using ray, aha
             self.distributed_executor_backend = backend
             logger.info("Defaulting to use %s for distributed inference",
                         backend)
 
         if self.distributed_executor_backend is None and self.world_size == 1:
-            self.distributed_executor_backend = "uni"
+            self.distributed_executor_backend = "uni"  # if world_size == 1, using uniproc
 
         self._verify_args()
 
@@ -1529,7 +1530,7 @@ class ParallelConfig:
                 "supported on AMD GPUs.")
         if self.ray_workers_use_nsight and not self.use_ray:
             raise ValueError("Unable to use nsight profiling unless workers "
-                             "run with Ray.")
+                             "run with Ray.")  # nsight only works on ray
 
         assert isinstance(self.worker_extension_cls, str), (
             "worker_extension_cls must be a string (qualified class name).")

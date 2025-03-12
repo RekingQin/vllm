@@ -57,7 +57,7 @@ class MultiprocExecutor(Executor):
 
         self.world_size = self.parallel_config.world_size
         tensor_parallel_size = self.parallel_config.tensor_parallel_size
-        assert self.world_size == tensor_parallel_size, (
+        assert self.world_size == tensor_parallel_size, (  # TODO it seems not work!!
             f"world_size ({self.world_size}) must be equal to the "
             f"tensor_parallel_size ({tensor_parallel_size}). "
             f"Pipeline parallelism is not yet implemented in v1")
@@ -78,7 +78,7 @@ class MultiprocExecutor(Executor):
 
         # Create workers
         self.workers: list[WorkerProcHandle] = []
-        for rank in range(self.world_size):
+        for rank in range(self.world_size):  # each process using one process
             worker = WorkerProc.make_worker_process(self.vllm_config, rank,
                                                     rank,
                                                     distributed_init_method,
@@ -218,7 +218,7 @@ class WorkerProc:
             "distributed_init_method": distributed_init_method,
             "is_driver_worker": rank == 0,
         }
-        wrapper.init_worker(all_kwargs)
+        wrapper.init_worker(all_kwargs)  # !!! very important
         self.worker = wrapper
 
         pid = os.getpid()

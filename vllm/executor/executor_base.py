@@ -49,7 +49,7 @@ class ExecutorBase(ABC):
         self.speculative_config = vllm_config.speculative_config
         self.prompt_adapter_config = vllm_config.prompt_adapter_config
         self.observability_config = vllm_config.observability_config
-        self._init_executor()
+        self._init_executor()  # initialize executor, global entrypoint
         self.is_sleeping = False
 
     @abstractmethod
