@@ -37,6 +37,7 @@ try:
     class RayWorkerWrapper(WorkerWrapperBase):  # Ray Worker in vLLM
         """Ray wrapper for vllm.worker.Worker, allowing Worker to be
         lazily initialized after Ray sets CUDA_VISIBLE_DEVICES."""
+        # lazily initializing !!! ????
 
         def __init__(self, *args, **kwargs) -> None:
             super().__init__(*args, **kwargs)

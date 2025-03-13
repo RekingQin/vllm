@@ -27,10 +27,6 @@ class FutureWrapper(Future):
 class RayDistributedExecutor(RayDistributedExecutorV0, Executor):
     """Ray distributed executor using Ray Compiled Graphs."""
 
-    def __init__(self):
-        super().__init__()
-        # wrapper.init_worker(all_kwargs)
-
     @property
     def max_concurrent_batches(self) -> int:
         """Ray distributed executor supports pipeline parallelism,
@@ -50,6 +46,7 @@ class RayDistributedExecutor(RayDistributedExecutorV0, Executor):
         Returns:
             The model runner output.
         """
+        # override v0 execute_model
         # Build the compiled DAG for the first time.
         if self.forward_dag is None:  # type: ignore
             self.forward_dag = self._compiled_ray_dag(enable_asyncio=False)

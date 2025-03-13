@@ -545,6 +545,7 @@ class WorkerWrapperBase:
         Here we inject some common logic before initializing the worker.
         Arguments are passed to the worker class constructor.
         """
+        # from ray distributed executor v0, self._run_workers("init_worker", all_kwargs)
         # initialize worker
         kwargs = all_kwargs[self.rpc_rank]
         self.vllm_config = kwargs.get("vllm_config", None)
