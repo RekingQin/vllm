@@ -350,8 +350,39 @@ def initialize_ray_cluster(
         # vLLM engine is also a worker to execute model with an accelerator,
         # so it requires to have the device in a current node. Check if
         # the current node has at least one device.
-        current_ip = get_ip()
-        current_node_id = ray.get_runtime_context().get_node_id()
+        head_ip = get_ip()
+        head_node_id = ray.get_runtime_context().get_node_id()
+
+        def _get_all_nodes_info():
+            nodes = ray.nodes()
+            node_ip_and_ids = []
+            for node_info in nodes:
+                if node_info.get("alive", False):
+                    node_id = node_info["NodeID"]
+                    ip = node_info["NodeManagerAddress"]
+                    node_ip_and_ids.append((ip, node_id))
+                else:
+                    raise ValueError(f"Non-Active node: {node_info.get('NodeID')}")
+            return node_ip_and_ids
+
+        def sort_by_driver_then_worker_ip(ip_and_id):
+            ip = ip_and_id[0]
+            return (0 if ip == head_ip else 1, ip)
+
+        all_node_ip_and_ids = _get_all_nodes_info()
+        all_node_ip_and_ids = sorted(all_node_ip_and_ids, key=sort_by_driver_then_worker_ip)
+
+        current_dp_rank = parallel_config.data_parallel_rank
+
+        # define select which node
+        assert current_dp_rank < len(all_node_ip_and_ids)
+        selected_node = all_node_ip_and_ids[current_dp_rank]
+        selected_node_ip, selected_node_id = selected_node
+
+        # current_ip = get_ip()
+        # current_node_id = ray.get_runtime_context().get_node_id()
+        current_ip = selected_node_ip
+        current_node_id = selected_node_id
         current_node_resource = available_resources_per_node()[current_node_id]
         if current_node_resource.get(device_str, 0) < 1:
             raise ValueError(
