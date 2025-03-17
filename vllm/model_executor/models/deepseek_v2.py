@@ -638,7 +638,7 @@ class DeepseekV2Model(nn.Module):
                 hidden_states = self.get_input_embeddings(input_ids)
             residual = None
         else:
-            assert intermediate_tensors is not None
+            assert intermediate_tensors is not None  # for multiple pipelines, the hidden states is from intermediate tensors
             hidden_states = intermediate_tensors["hidden_states"]
             residual = intermediate_tensors["residual"]
 
@@ -683,7 +683,7 @@ class DeepseekV2ForCausalLM(nn.Module, SupportsPP):
         self,
         input_ids: torch.Tensor,
         positions: torch.Tensor,
-        intermediate_tensors: Optional[IntermediateTensors] = None,
+        intermediate_tensors: Optional[IntermediateTensors] = None,  # for multiple pipelines
         inputs_embeds: Optional[torch.Tensor] = None,
     ) -> Union[torch.Tensor, IntermediateTensors]:
         hidden_states = self.model(input_ids, positions, intermediate_tensors,

@@ -148,7 +148,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
 
         # Set up speculative decoding.
         self.use_spec_decode = False
-        if self.speculative_config:
+        if self.speculative_config:  # speculative decoding??
             self.use_spec_decode = True
             self.rejection_sampler = RejectionSampler()
             # TODO: find a better way to check if we are using ngram.
@@ -934,7 +934,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         # Prepare the decoder inputs.
         attn_metadata, logits_indices = self._prepare_inputs(scheduler_output)
         num_scheduled_tokens = scheduler_output.total_num_scheduled_tokens
-        if (self.use_cuda_graph
+        if (self.use_cuda_graph  # currently, not supported in v1??
                 and num_scheduled_tokens <= self.cudagraph_batch_sizes[-1]):
             # Use piecewise CUDA graphs.
             # Add padding to the batch size.
@@ -971,7 +971,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         else:
             positions = self.positions[:num_input_tokens]
 
-        if get_pp_group().is_first_rank:
+        if get_pp_group().is_first_rank: # yes for DP
             intermediate_tensors = None
         else:
             assert intermediate_tensors is not None
@@ -986,15 +986,15 @@ class GPUModelRunner(LoRAModelRunnerMixin):
 
         # Run the decoder.
         # Use persistent buffers for CUDA graphs.
-        with set_forward_context(attn_metadata, self.vllm_config):  # set forward context
+        with set_forward_context(attn_metadata, self.vllm_config):  # set forward context, will be used in EP MoE
             hidden_states = self.model(
                 input_ids=input_ids,
                 positions=positions,
-                intermediate_tensors=intermediate_tensors,
+                intermediate_tensors=intermediate_tensors,  # for multiple pipelines (PP mode)
                 inputs_embeds=inputs_embeds,
             )
         if not get_pp_group().is_last_rank:
-            # For mid-pipeline stages, return the hidden states.
+            # For mid-pipeline stages, return the hidden states. used for next pipeline
             return hidden_states
 
         hidden_states = hidden_states[:num_scheduled_tokens]
@@ -1073,7 +1073,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             spec_token_ids = self.generate_draft_token_ids(
                 valid_sampled_token_ids)
 
-        return ModelRunnerOutput(
+        return ModelRunnerOutput(  #2 return
             req_ids=self.input_batch.req_ids,
             req_id_to_index=self.input_batch.req_id_to_index,
             sampled_token_ids=valid_sampled_token_ids,
@@ -1111,6 +1111,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         return draft_token_ids
 
     def load_model(self) -> None:
+        # load the model
         logger.info("Starting to load model %s...", self.model_config.model)
         with DeviceMemoryProfiler() as m:  # noqa: SIM117
             time_before_load = time.perf_counter()

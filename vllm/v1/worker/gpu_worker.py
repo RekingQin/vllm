@@ -37,7 +37,7 @@ class Worker(WorkerBase):
         vllm_config: VllmConfig,
         local_rank: int,
         rank: int,
-        distributed_init_method: str,
+        distributed_init_method: str,  # driver ip usage
         is_driver_worker: bool = False,
     ):
 
@@ -116,7 +116,7 @@ class Worker(WorkerBase):
         set_random_seed(self.model_config.seed)
 
         # Construct the model runner
-        self.model_runner: GPUModelRunner = GPUModelRunner(
+        self.model_runner: GPUModelRunner = GPUModelRunner(  # load runner
             self.vllm_config, self.device)
 
     # FIXME(youkaichao & ywang96): Use TorchDispatchMode instead of memory pool

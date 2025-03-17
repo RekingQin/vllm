@@ -66,7 +66,7 @@ class EngineCore:
         self.structured_output_manager = StructuredOutputManager(vllm_config)
 
         # Setup scheduler.
-        self.scheduler = Scheduler(
+        self.scheduler = Scheduler(  # initialize the scheduler
             scheduler_config=vllm_config.scheduler_config,
             model_config=vllm_config.model_config,
             cache_config=vllm_config.cache_config,
