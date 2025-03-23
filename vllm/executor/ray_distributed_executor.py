@@ -386,7 +386,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
                 local_rank=local_rank,
                 rank=rank,
                 distributed_init_method=distributed_init_method,
-                is_driver_worker=(not self.parallel_config)
+                is_driver_worker=(not self.parallel_config) # the first worker to be driver worker
                 or (rank % self.parallel_config.tensor_parallel_size == 0),
             )
             all_kwargs.append(kwargs)
