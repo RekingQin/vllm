@@ -710,12 +710,12 @@ class Scheduler:
 
     def _free_request(self, request: Request) -> None:
         assert request.is_finished()
-        self.kv_cache_manager.free(request)
+        self.kv_cache_manager.free(request)  # free kv caches
         self.kv_cache_manager.free_block_hashes(request)
-        self.encoder_cache_manager.free(request)
+        self.encoder_cache_manager.free(request) # free encoder cache
         self._cached_reqs_data.pop(request.request_id, None)
         del self.requests[request.request_id]
-        self.finished_req_ids.add(request.request_id)
+        self.finished_req_ids.add(request.request_id)  # add into finished_req_ids
 
     def get_num_unfinished_requests(self) -> int:
         return len(self.waiting) + len(self.running)
