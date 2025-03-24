@@ -1198,6 +1198,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
 
         return prompt_logprobs_dict
 
+    #### !!!! for self.execute_dummy_batch() in vllm/v1/engine/core.py, num_tokens == 1
     @torch.inference_mode()
     def _dummy_run(
         self,

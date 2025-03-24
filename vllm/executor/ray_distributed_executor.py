@@ -390,7 +390,7 @@ class RayDistributedExecutor(DistributedExecutorBase):
                 or (rank % self.parallel_config.tensor_parallel_size == 0),
             )
             all_kwargs.append(kwargs)
-        self._run_workers("init_worker", all_kwargs)
+        self._run_workers("init_worker", all_kwargs)  # actually initialize the work(GPUWorker/GPUModelRunner)
 
         self._run_workers("init_device")
         self._run_workers("load_model",

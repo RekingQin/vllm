@@ -285,14 +285,14 @@ class Processor:
 
         return EngineCoreRequest(
             request_id=request_id,
-            prompt=decoder_inputs.prompt,
-            prompt_token_ids=decoder_inputs.prompt_token_ids,
+            prompt=decoder_inputs.prompt,  # prompt text
+            prompt_token_ids=decoder_inputs.prompt_token_ids,  # prompt token ids from adapter
             mm_inputs=sorted_mm_inputs,
             mm_hashes=sorted_mm_hashes,
             mm_placeholders=sorted_mm_positions,
             sampling_params=sampling_params,
             eos_token_id=eos_token_id,
-            arrival_time=arrival_time,
+            arrival_time=arrival_time,  # request
             lora_request=lora_request,
         )
 

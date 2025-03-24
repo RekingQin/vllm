@@ -460,7 +460,7 @@ class InputPreprocessor:
                 lora_request=lora_request,
             )
 
-            return token_inputs(
+            return token_inputs(  # token inputs
                 prompt=prompt_text,
                 prompt_token_ids=prompt_token_ids,
                 multi_modal_data=multi_modal_data,

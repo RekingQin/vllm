@@ -50,7 +50,7 @@ class AsyncLLM(EngineClient):
         start_engine_loop: bool = True,
     ) -> None:
 
-        assert start_engine_loop
+        assert start_engine_loop  # must be true
 
         self.model_config = vllm_config.model_config
 
@@ -114,7 +114,7 @@ class AsyncLLM(EngineClient):
         else:
             vllm_config = engine_config
 
-        executor_class = Executor.get_class(vllm_config)
+        executor_class = Executor.get_class(vllm_config)  # get RayDistributedExecutor
 
         # Create the AsyncLLM.
         return cls(
@@ -123,7 +123,7 @@ class AsyncLLM(EngineClient):
             log_requests=not engine_args.disable_log_requests,
             log_stats=not engine_args.disable_log_stats,
             start_engine_loop=start_engine_loop,
-            usage_context=usage_context,
+            usage_context=usage_context,  # API_SERVER
         )
 
     def shutdown(self):

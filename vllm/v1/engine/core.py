@@ -274,7 +274,7 @@ class EngineCoreProc(EngineCore):
                          args=(output_path, engine_index),
                          daemon=True).start()
 
-        self.global_unfinished_reqs = False
+        self.global_unfinished_reqs = False  # whether having unfinished reqs globally
 
         self.step_fn = (self.step if self.batch_queue is None else
                         self.step_with_batch_queue)
@@ -344,7 +344,7 @@ class EngineCoreProc(EngineCore):
         """Exits when an engine step needs to be performed."""
 
         # firstly, processing unfinished requests
-        while not self.global_unfinished_reqs and not (
+        while not self.global_unfinished_reqs and not (  # waiting for requests
                 self.scheduler.has_requests()):
             if self.input_queue.empty():
                 logger.info("EngineCore waiting for work.")
@@ -373,10 +373,10 @@ class EngineCoreProc(EngineCore):
             self.add_request(request)
         elif request_type == EngineCoreRequestType.ABORT:
             self.abort_requests(request)
-        elif request_type == EngineCoreRequestType.START_DP:
+        elif request_type == EngineCoreRequestType.START_DP:  # START_DP message
             if not self.global_unfinished_reqs:
                 logger.info("EngineCore starting idle loop.")  # idle loop
-                self.global_unfinished_reqs = True
+                self.global_unfinished_reqs = True  # mark True
         elif request_type == EngineCoreRequestType.UTILITY:
             call_id, method_name, args = request
             output = UtilityOutput(call_id)
@@ -469,7 +469,7 @@ class DPEngineCoreProc(EngineCoreProc):
         dp_rank = vllm_config.parallel_config.data_parallel_rank
 
         from vllm.platforms import current_platform
-        if current_platform.is_cuda_alike():
+        if current_platform.is_cuda_alike():  # pay attention to it
             from vllm.platforms.cuda import device_id_to_physical_device_id
             tp_size = vllm_config.parallel_config.tensor_parallel_size
             os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(

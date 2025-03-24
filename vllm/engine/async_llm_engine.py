@@ -779,7 +779,7 @@ class AsyncLLMEngine(EngineClient):
         self.engine.abort_request(request_ids)
 
     @staticmethod
-    async def run_engine_loop(engine_ref: ReferenceType):
+    async def run_engine_loop(engine_ref: ReferenceType):  # engine loop
         """We use a weakref to the engine so that the running loop
         doesn't prevent the engine being garbage collected."""
         engine: Optional[AsyncLLMEngine] = engine_ref()

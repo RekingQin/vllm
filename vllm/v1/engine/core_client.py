@@ -47,8 +47,8 @@ class EngineCoreClient(ABC):
 
     @staticmethod
     def make_client(
-        multiprocess_mode: bool,
-        asyncio_mode: bool,
+        multiprocess_mode: bool,  # default to be true
+        asyncio_mode: bool,  # default to be true
         vllm_config: VllmConfig,
         executor_class: type[Executor],
         log_stats: bool,
@@ -362,7 +362,7 @@ class MPClient(EngineCoreClient):
         core_engines: list[CoreEngine],
     ) -> None:
 
-        # Default case - single core engine.
+        # Default case - single core engine. just for MPClient
         core_engine = new_core_engine(0)
         core_engines.append(core_engine)
         self.core_engine = core_engine
@@ -675,13 +675,14 @@ class DPAsyncMPClient(AsyncMPClient):
         # select least busy EngineCore to processing current request
         chosen_engine = self.get_core_engine_for_request()
         self.reqs_in_flight[request.request_id] = chosen_engine
-        chosen_engine.num_reqs_in_flight += 1
-        if self.num_engines_running >= len(self.core_engines):
+        chosen_engine.num_reqs_in_flight += 1  # need lock
+        if self.num_engines_running >= len(self.core_engines): # all engines(except chosen engine) having running requests
             await chosen_engine.send_multipart(msg)
         else:
             # Send request to chosen engine and dp start loop
             # control message to all other engines.
-            self.num_engines_running += len(self.core_engines)
+            # engines_has_no_reqs
+            self.num_engines_running += len(self.core_engines)  # += len(engines_has_no_reqs) + 1
             await asyncio.gather(*[
                 engine.send_multipart(msg if engine is
                                       chosen_engine else self.start_dp_msg)
@@ -697,16 +698,16 @@ class DPAsyncMPClient(AsyncMPClient):
         if self.reqs_in_flight:
             for req_id in outputs.finished_requests or ():
                 if engine := self.reqs_in_flight.pop(req_id, None):
-                    engine.num_reqs_in_flight -= 1
+                    engine.num_reqs_in_flight -= 1  # need lock
 
-        if outputs.engine_paused:
+        if outputs.engine_paused:  # if having no requests, it will be paused or not ??
             assert self.num_engines_running >= 1
             self.num_engines_running -= 1
-            if not self.num_engines_running and self.reqs_in_flight:  # some dp is running, but some dp is empty
+            if not self.num_engines_running and self.reqs_in_flight:  # some dp is running, but some dp is empty, very important
                 # If there are requests in flight here, they must have
                 # been sent after the engines paused. We must make
                 # sure to start the other engines:
-                self.num_engines_running = len(self.core_engines)
+                self.num_engines_running = len(self.core_engines)  # need optimization, +len(engine has no reqs)
                 coros = [
                     engine.send_multipart(self.start_dp_msg)
                     for engine in self.core_engines
@@ -719,7 +720,7 @@ class DPAsyncMPClient(AsyncMPClient):
             # Unset the final flag if we haven't yet received outputs
             # from all engines for this step.
             self.outputs_counter += 1
-            if self.outputs_counter == len(self.core_engines):
+            if self.outputs_counter == len(self.core_engines):  # for what
                 self.outputs_counter = 0
             else:
                 outputs.final_outputs_for_step = False

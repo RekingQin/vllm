@@ -34,7 +34,7 @@ engine = None
 
 
 @app.get("/health")
-async def health() -> Response:
+async def health() -> Response:  # for heartbeat
     """Health check."""
     return Response(status_code=200)
 
@@ -54,13 +54,13 @@ async def generate(request: Request) -> Response:
 
 @with_cancellation
 async def _generate(request_dict: dict, raw_request: Request) -> Response:
-    prompt = request_dict.pop("prompt")
-    stream = request_dict.pop("stream", False)
-    sampling_params = SamplingParams(**request_dict)
-    request_id = random_uuid()
+    prompt = request_dict.pop("prompt")  # get prompt
+    stream = request_dict.pop("stream", False) # is stream mode or not
+    sampling_params = SamplingParams(**request_dict)  # output control related params
+    request_id = random_uuid() # unique id
 
     assert engine is not None
-    results_generator = engine.generate(prompt, sampling_params, request_id)
+    results_generator = engine.generate(prompt, sampling_params, request_id)  # generate output
 
     # Streaming case
     async def stream_results() -> AsyncGenerator[bytes, None]:
@@ -73,7 +73,7 @@ async def _generate(request_dict: dict, raw_request: Request) -> Response:
             ret = {"text": text_outputs}
             yield (json.dumps(ret) + "\n").encode("utf-8")
 
-    if stream:
+    if stream: # streaming output
         return StreamingResponse(stream_results())
 
     # Non-streaming case
@@ -93,7 +93,7 @@ async def _generate(request_dict: dict, raw_request: Request) -> Response:
 
 
 def build_app(args: Namespace) -> FastAPI:
-    global app
+    global app  # global instance, FastAPI()
 
     app.root_path = args.root_path
     return app
@@ -103,11 +103,12 @@ async def init_app(
     args: Namespace,
     llm_engine: Optional[AsyncLLMEngine] = None,
 ) -> FastAPI:
-    app = build_app(args)
+    app = build_app(args)  # update root path of FastAPI instance
 
     global engine
 
-    engine_args = AsyncEngineArgs.from_cli_args(args)
+    engine_args = AsyncEngineArgs.from_cli_args(args)  # parsing engine args using dataclass reflection
+    # using AsyncLLEngine by default
     engine = (llm_engine
               if llm_engine is not None else AsyncLLMEngine.from_engine_args(
                   engine_args, usage_context=UsageContext.API_SERVER))
@@ -123,10 +124,10 @@ async def run_server(args: Namespace,
 
     set_ulimit()
 
-    app = await init_app(args, llm_engine)
+    app = await init_app(args, llm_engine)  # init the FastAPI app & LLMEngine
     assert engine is not None
 
-    shutdown_task = await serve_http(
+    shutdown_task = await serve_http(  # serving loop until shutdown
         app,
         sock=None,
         enable_ssl_refresh=args.enable_ssl_refresh,
