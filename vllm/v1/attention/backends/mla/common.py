@@ -400,6 +400,7 @@ class MLACommonMetadataBuilder(Generic[M]):
 
     def reorder_batch(self, input_batch: "InputBatch",
                       scheduler_output: "SchedulerOutput") -> bool:
+        # reorder to get better performance
         # We now want to reorder the batch so that the "decode" requests are and
         # the front and the "prefill" requests are at the using the least amount
         # swaps possible. (NOTE for now we loosely use "decode" to mean requests
@@ -417,7 +418,7 @@ class MLACommonMetadataBuilder(Generic[M]):
             # we should update this to something like < 8 in the future but
             # currently the TritonMLA._forward_decode only supports
             # num_tokens = 1
-            if num_tokens == 1:
+            if num_tokens == 1:  # num_tokens = 1 may be prefilling (with only 1 input token)
                 decodes.append(i)
                 num_decode_tokens += num_tokens
             else:

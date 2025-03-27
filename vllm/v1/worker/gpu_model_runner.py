@@ -302,7 +302,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         # they will be scheduled again sometime in the future.
         scheduled_req_ids = scheduler_output.num_scheduled_tokens.keys()
         cached_req_ids = self.input_batch.req_id_to_index.keys()
-        unscheduled_req_ids = cached_req_ids - scheduled_req_ids
+        unscheduled_req_ids = cached_req_ids - scheduled_req_ids  # unscheduled_req_ids should be as small as possible
         # NOTE(woosuk): The persistent batch optimization assumes that
         # consecutive batches contain mostly the same requests. If batches
         # have low request overlap (e.g., alternating between two distinct
@@ -314,7 +314,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
 
         req_ids_to_add: list[str] = []
         # Add new requests to the cached states.
-        for new_req_data in scheduler_output.scheduled_new_reqs:
+        for new_req_data in scheduler_output.scheduled_new_reqs:  # for new scheduler requests, may be new coming requests
             req_id = new_req_data.req_id
             sampling_params = new_req_data.sampling_params
             if sampling_params.sampling_type == SamplingType.RANDOM_SEED:
@@ -368,12 +368,12 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             req_ids_to_add.append(req_id)
 
         # Update the states of the running/resumed requests.
-        for req_data in scheduler_output.scheduled_cached_reqs:
+        for req_data in scheduler_output.scheduled_cached_reqs:  # requests have cached states and continue running
             req_id = req_data.req_id
             req_state = self.requests[req_id]
 
             # Update the cached states.
-            num_computed_tokens = req_data.num_computed_tokens
+            num_computed_tokens = req_data.num_computed_tokens  # update current step computed_tokens
             req_state.num_computed_tokens = num_computed_tokens
             # Add the sampled token(s) from the previous step (if any).
             # This doesn't include "unverified" tokens like spec decode tokens.
@@ -448,7 +448,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             self.input_batch.condense(removed_req_indices)
 
         if batch_changed:
-            self.input_batch.refresh_sampling_metadata()
+            self.input_batch.refresh_sampling_metadata()  # after adding & condense, refresh some structure
 
     def _prepare_inputs(
         self,
@@ -456,13 +456,13 @@ class GPUModelRunner(LoRAModelRunnerMixin):
     ) -> tuple[FlashAttentionMetadata, torch.Tensor]:
         total_num_scheduled_tokens = scheduler_output.total_num_scheduled_tokens
         assert total_num_scheduled_tokens > 0
-        num_reqs = self.input_batch.num_reqs
+        num_reqs = self.input_batch.num_reqs  # the number of reqs to be processed in next step
         assert num_reqs > 0
 
         # Some attention backends (namely MLA) may want to separate requests
         # based on if the attention computation will be compute-bound or
         # memory-bound. This gives them a hook to do that.
-        modified_batch = self.attn_metadata_builder.reorder_batch(
+        modified_batch = self.attn_metadata_builder.reorder_batch(  # make sure decode are at the front of batch
             self.input_batch, scheduler_output)
         if modified_batch:
             self.input_batch.refresh_sampling_metadata()
@@ -512,7 +512,7 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         # Get token indices.
         # E.g., [0, 1, 0, 1, 2, 3, 4, 0, 1, 2]
         # -> [0, 1, M, M + 1, M + 2, M + 3, M + 4, 2 * M, 2 * M + 1, 2 * M + 2]
-        # where M is the max_model_len.
+        # where M is the max_model_len (defined in token_ids_cpu).
         token_indices = (positions_np +
                          req_indices * self.input_batch.token_ids_cpu.shape[1])
 

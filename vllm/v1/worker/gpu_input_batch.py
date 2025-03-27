@@ -71,7 +71,7 @@ class InputBatch:
         # Find a way to reduce the CPU memory usage.
         # This buffer is not directly transferred to the GPU, so it does not
         # need to be pinned.
-        self.token_ids_cpu_tensor = torch.zeros(
+        self.token_ids_cpu_tensor = torch.zeros(  # batch_size * max_model_len
             (max_num_reqs, max_model_len),
             device="cpu",
             dtype=torch.int32,
@@ -232,7 +232,7 @@ class InputBatch:
         if req_index == len(self._req_ids):
             self._req_ids.append(req_id)
             self.req_output_token_ids.append(request.output_token_ids)
-        else:
+        else:  # replace finished req or preempted req directly
             self._req_ids[req_index] = req_id
             self.req_output_token_ids[req_index] = request.output_token_ids
 
@@ -449,12 +449,12 @@ class InputBatch:
         # is sorted in descending order.
         last_req_index = num_reqs + len(empty_req_indices) - 1
         while empty_req_indices:
-            # Find the largest non-empty index.
+            # Find the largest non-empty index. choose highest efficient way
             while last_req_index in empty_req_indices:
                 last_req_index -= 1
 
             # Find the smallest empty index.
-            empty_index = empty_req_indices.pop()
+            empty_index = empty_req_indices.pop()  # which index will be replaced, swapped with the last req
             if empty_index >= last_req_index:
                 break
 
