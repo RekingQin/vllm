@@ -113,10 +113,10 @@ def _initialize_model(
 ) -> nn.Module:
     """Initialize a model with the given configurations."""
     model_config = vllm_config.model_config
-    model_class, _ = get_model_architecture(model_config)
+    model_class, _ = get_model_architecture(model_config)  # get DeepseekV3ForCausalLM
 
     if vllm_config.quant_config is not None:
-        configure_quant_config(vllm_config.quant_config, model_class)
+        configure_quant_config(vllm_config.quant_config, model_class)  # quant related configs
 
     signatures = inspect.signature(model_class.__init__)
     all_params = [param.name for param in signatures.parameters.values()]
@@ -357,7 +357,7 @@ class DefaultModelLoader(BaseModelLoader):
                 self.load_config.use_tqdm_on_load,
             )
         elif use_safetensors:
-            weights_iterator = safetensors_weights_iterator(
+            weights_iterator = safetensors_weights_iterator(  # using safetensors weights iterator to loading model params
                 hf_weights_files,
                 self.load_config.use_tqdm_on_load,
             )
@@ -399,7 +399,7 @@ class DefaultModelLoader(BaseModelLoader):
             allow_patterns_overrides=getattr(model, "allow_patterns_overrides",
                                              None),
         )
-        yield from self._get_weights_iterator(primary_weights)
+        yield from self._get_weights_iterator(primary_weights)  # lazy loading
 
         secondary_weights = cast(
             Iterable[DefaultModelLoader.Source],
@@ -439,7 +439,7 @@ class DefaultModelLoader(BaseModelLoader):
                         "Following weights were not initialized from "
                         f"checkpoint: {weights_not_loaded}")
 
-            _process_weights_after_loading(model, model_config, target_device)
+            _process_weights_after_loading(model, model_config, target_device)  # quant processing
 
         return model.eval()
 
@@ -1462,4 +1462,4 @@ def get_model_loader(load_config: LoadConfig) -> BaseModelLoader:
     if load_config.load_format == LoadFormat.RUNAI_STREAMER:
         return RunaiModelStreamerLoader(load_config)
 
-    return DefaultModelLoader(load_config)
+    return DefaultModelLoader(load_config)  # using default loader
