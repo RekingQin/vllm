@@ -62,8 +62,8 @@ class DeepseekV2MLP(nn.Module):
 
     def __init__(
         self,
-        hidden_size: int,
-        intermediate_size: int,
+        hidden_size: int,  # 7168
+        intermediate_size: int,  # 18432
         hidden_act: str,
         quant_config: Optional[QuantizationConfig] = None,
         reduce_results: bool = True,
@@ -342,16 +342,16 @@ class DeepseekV2MLAAttention(nn.Module):
     def __init__(
         self,
         config: PretrainedConfig,
-        hidden_size: int,
-        num_heads: int,
-        qk_nope_head_dim: int,
-        qk_rope_head_dim: int,
-        v_head_dim: int,
-        q_lora_rank: Optional[int],
-        kv_lora_rank: int,
+        hidden_size: int,  # 7168
+        num_heads: int,  # 128
+        qk_nope_head_dim: int,  # 128
+        qk_rope_head_dim: int,  # 64
+        v_head_dim: int,  # 128
+        q_lora_rank: Optional[int],  # 1536
+        kv_lora_rank: int,  # 512
         rope_theta: float = 10000,
         rope_scaling: Optional[Dict[str, Any]] = None,
-        max_position_embeddings: int = 8192,
+        max_position_embeddings: int = 8192,  # 163840
         cache_config: Optional[CacheConfig] = None,
         quant_config: Optional[QuantizationConfig] = None,
         prefix: str = "",
@@ -360,10 +360,10 @@ class DeepseekV2MLAAttention(nn.Module):
         self.hidden_size = hidden_size
         self.qk_nope_head_dim = qk_nope_head_dim
         self.qk_rope_head_dim = qk_rope_head_dim
-        self.qk_head_dim = qk_nope_head_dim + qk_rope_head_dim
+        self.qk_head_dim = qk_nope_head_dim + qk_rope_head_dim  # 192
         self.v_head_dim = v_head_dim
 
-        self.q_lora_rank = q_lora_rank
+        self.q_lora_rank = q_lora_rank  # 1536
         self.kv_lora_rank = kv_lora_rank
 
         self.num_heads = num_heads
@@ -376,15 +376,17 @@ class DeepseekV2MLAAttention(nn.Module):
         self.max_position_embeddings = max_position_embeddings
 
         if self.q_lora_rank is not None:
+            # in = 7168, out = 1536
             self.q_a_proj = ReplicatedLinear(self.hidden_size,
-                                             self.q_lora_rank,
+                                             self.q_lora_rank,  # 1536
                                              bias=False,
                                              quant_config=quant_config,
                                              prefix=f"{prefix}.q_a_proj")
             self.q_a_layernorm = RMSNorm(self.q_lora_rank,
                                          eps=config.rms_norm_eps)
-            self.q_b_proj = ColumnParallelLinear(q_lora_rank,
-                                                 self.num_heads *
+            # in = 1536, out = 24576
+            self.q_b_proj = ColumnParallelLinear(q_lora_rank,  # 1536
+                                                 self.num_heads *  # 192 * 128
                                                  self.qk_head_dim,
                                                  bias=False,
                                                  quant_config=quant_config,
@@ -397,21 +399,24 @@ class DeepseekV2MLAAttention(nn.Module):
                                                quant_config=quant_config,
                                                prefix=f"{prefix}.q_proj")
 
+        # in = 7168, out = 576
         self.kv_a_proj_with_mqa = ReplicatedLinear(
             self.hidden_size,
-            self.kv_lora_rank + self.qk_rope_head_dim,
+            self.kv_lora_rank + self.qk_rope_head_dim,  # 512 + 64
             bias=False,
             quant_config=quant_config,
             prefix=f"{prefix}.kv_a_proj_with_mqa")
         self.kv_a_layernorm = RMSNorm(self.kv_lora_rank,
                                       eps=config.rms_norm_eps)
+        # in = 576, out = 32768
         self.kv_b_proj = ColumnParallelLinear(
-            self.kv_lora_rank,
-            self.num_heads * (self.qk_nope_head_dim + self.v_head_dim),
+            self.kv_lora_rank,  # 512
+            self.num_heads * (self.qk_nope_head_dim + self.v_head_dim),  # 128 * (128 + 128) = 32768
             bias=False,
             quant_config=quant_config,
             prefix=f"{prefix}.kv_b_proj")
-        self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim,
+        # in = 16384, out = 7168
+        self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim,  # 128 * 128
                                         self.hidden_size,
                                         bias=False,
                                         quant_config=quant_config,
@@ -439,7 +444,7 @@ class DeepseekV2MLAAttention(nn.Module):
         #     kv_lora_rank + qk_rope_head_dim == head_size
         self.mla_attn = Attention(
             num_heads=self.num_local_heads,
-            head_size=self.kv_lora_rank + self.qk_rope_head_dim,
+            head_size=self.kv_lora_rank + self.qk_rope_head_dim,  # 512 + 64
             scale=self.scaling,
             num_kv_heads=1,
             cache_config=cache_config,
@@ -447,16 +452,16 @@ class DeepseekV2MLAAttention(nn.Module):
             prefix=f"{prefix}.attn",
             use_mla=True,
             # MLA Args
-            q_lora_rank=self.q_lora_rank,
-            kv_lora_rank=self.kv_lora_rank,
-            qk_nope_head_dim=self.qk_nope_head_dim,
-            qk_rope_head_dim=self.qk_rope_head_dim,
-            qk_head_dim=self.qk_head_dim,
-            v_head_dim=self.v_head_dim,
+            q_lora_rank=self.q_lora_rank,  # 1536
+            kv_lora_rank=self.kv_lora_rank,  # 512
+            qk_nope_head_dim=self.qk_nope_head_dim, # 128
+            qk_rope_head_dim=self.qk_rope_head_dim, # 64
+            qk_head_dim=self.qk_head_dim,  # 128
+            v_head_dim=self.v_head_dim,  # 128
             rotary_emb=self.rotary_emb,
-            q_proj=self.q_proj if self.q_lora_rank is None else self.q_b_proj,
-            kv_b_proj=self.kv_b_proj,
-            o_proj=self.o_proj,
+            q_proj=self.q_proj if self.q_lora_rank is None else self.q_b_proj,  # query project
+            kv_b_proj=self.kv_b_proj,  # kv project
+            o_proj=self.o_proj,  # output project
         )
 
         self.prefix = prefix
@@ -468,13 +473,13 @@ class DeepseekV2MLAAttention(nn.Module):
         hidden_states: torch.Tensor,
     ) -> torch.Tensor:
         if self.q_lora_rank is not None:
-            ckq = self.q_a_proj(hidden_states)[0]
-            hidden_states_or_q_c = self.q_a_layernorm(ckq)
+            ckq = self.q_a_proj(hidden_states)[0]  # 7168 -> 1536
+            hidden_states_or_q_c = self.q_a_layernorm(ckq)  # 1536
         else:
             hidden_states_or_q_c = hidden_states
-        kv_c, k_pe = self.kv_a_proj_with_mqa(hidden_states)[0].split(
+        kv_c, k_pe = self.kv_a_proj_with_mqa(hidden_states)[0].split(  # 7168 -> (512, 64)
             [self.kv_lora_rank, self.qk_rope_head_dim], dim=-1)
-        kv_c_normed = self.kv_a_layernorm(kv_c.contiguous())
+        kv_c_normed = self.kv_a_layernorm(kv_c.contiguous())  # 512
         return self.mla_attn(hidden_states_or_q_c,
                              kv_c_normed,
                              k_pe,
