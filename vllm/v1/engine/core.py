@@ -356,7 +356,7 @@ class EngineCoreProc(EngineCore):
 
         self.step_fn = (self.step if self.batch_queue is None else
                         self.step_with_batch_queue)
-        self.engines_running = False
+        self.engines_running = False  # where does it updated ?
 
         # Background Threads and Queues for IO. These enable us to
         # overlap ZMQ socket IO with GPU since they release the GIL,
@@ -650,7 +650,7 @@ class DPEngineCoreProc(EngineCoreProc):
         if request.current_wave != self.current_wave:
             if request.current_wave > self.current_wave:
                 self.current_wave = request.current_wave
-            elif not self.engines_running:
+            elif not self.engines_running:  # but we still add the request to input queue
                 # Request received for an already-completed wave, notify
                 # front-end that we need to start the next one.
                 self.output_queue.put_nowait(
@@ -714,7 +714,7 @@ class DPEngineCoreProc(EngineCoreProc):
                     # Notify client that we are pausing the loop.
                     logger.debug("Wave %d finished, pausing engine loop.",
                                  self.current_wave)
-                    self.output_queue.put_nowait(
+                    self.output_queue.put_nowait(  # all engines finished, go to next wave
                         EngineCoreOutputs(wave_complete=self.current_wave))
                 self.current_wave += 1
 

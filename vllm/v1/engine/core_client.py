@@ -838,7 +838,7 @@ class DPAsyncMPClient(AsyncMPClient):
     def __init__(self, vllm_config: VllmConfig, executor_class: type[Executor],
                  log_stats: bool):
 
-        self.current_wave = 0
+        self.current_wave = 0  # current_wave only updated based engine output info, otherwise it won't update itself
         self.engines_running = False
         self.reqs_in_flight: dict[str, CoreEngine] = {}
 
@@ -877,7 +877,7 @@ class DPAsyncMPClient(AsyncMPClient):
 
         to_await = self._send_input(EngineCoreRequestType.ADD, request,
                                     chosen_engine)
-        if not self.engines_running:
+        if not self.engines_running:  # directly broadcasts all engines except itself, it will cause multiple dummy run
             # Send request to chosen engine and dp start loop
             # control message to all other engines.
             self.engines_running = True
@@ -900,14 +900,14 @@ class DPAsyncMPClient(AsyncMPClient):
                 if engine := self.reqs_in_flight.pop(req_id, None):
                     engine.num_reqs_in_flight -= 1
 
-        if outputs.wave_complete is not None:
+        if outputs.wave_complete is not None:  # engine return current wave is completed, increase current wave
             # Current wave is complete, move to next wave number
             # and mark engines as paused.
             if self.current_wave <= outputs.wave_complete:
                 self.current_wave = outputs.wave_complete + 1
                 self.engines_running = False
 
-        elif outputs.start_wave is not None and (
+        elif outputs.start_wave is not None and (  # start a new dp wave
                 outputs.start_wave > self.current_wave or
             (outputs.start_wave == self.current_wave
              and not self.engines_running)):
