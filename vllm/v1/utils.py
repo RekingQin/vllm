@@ -219,13 +219,13 @@ class APIServerProcessManager:
         self._finalizer()
 
 
-class CoreEngineProcManager:
+class CoreEngineProcManager: # renamed from BackgroundProcHandle
     """
     Utility class to handle creation, readiness, and shutdown
     of background processes used by the AsyncLLM and LLMEngine.
     """
 
-    def __init__(
+    def __init__( # except target_fn not changed, all other parameters have been changed
         self,
         target_fn: Callable,
         local_engine_count: int,
@@ -247,11 +247,11 @@ class CoreEngineProcManager:
         }
 
         self.processes: list[BaseProcess] = []
-        for index in range(local_engine_count):
+        for index in range(local_engine_count): # how many engines in local dp rank
             local_index = local_start_index + index
             global_index = start_index + index
             # Start EngineCore in background process.
-            self.processes.append(
+            self.processes.append(  # start processes for current CoreEngine
                 context.Process(target=target_fn,
                                 name=f"EngineCore_{global_index}",
                                 kwargs=common_kwargs | {

@@ -1743,7 +1743,7 @@ class ParallelConfig:
     data_parallel_size: int = 1
     """Number of data parallel groups. MoE layers will be sharded according to
     the product of the tensor parallel size and data parallel size."""
-    data_parallel_size_local: int = 1
+    data_parallel_size_local: int = 1   # new added for multi-nodes dp
     """Number of local data parallel groups."""
     data_parallel_rank: int = 0
     """Rank of the data parallel group."""
@@ -1884,7 +1884,7 @@ class ParallelConfig:
 
         if self.data_parallel_size > 1 or self.data_parallel_size_local == 0:
             # Data parallel was specified in the engine args.
-            self.data_parallel_master_port = get_open_port()
+            self.data_parallel_master_port = get_open_port()  # in dp mode, the master port differs in different nodes
         else:
             # Otherwise fall back to env vars (e.g. for offline SPMD case).
             self.data_parallel_size = envs.VLLM_DP_SIZE
